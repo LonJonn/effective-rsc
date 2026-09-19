@@ -1,3 +1,4 @@
+import 'effect/unstable/schema/SchemaJITCompiler/enable';
 import * as BunRuntime from '@effect/platform-bun/BunRuntime';
 import { Deferred, Effect, Runtime } from 'effect';
 

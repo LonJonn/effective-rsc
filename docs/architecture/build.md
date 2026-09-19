@@ -8,6 +8,13 @@ dependencies are embedded; React, React DOM, and Effect remain external peers. P
 point to built JavaScript, preserve RSC directives, and expose deliberate subpaths. The package also
 ships its source guides and generated `LLMS.md`.
 
+Effect Schema compiles through its JIT compiler in every graph. The registry is module state of one
+Effect instance, so each realm enables it at its own entry, ahead of any schema construction: the
+browser entry, the `'use server-entry'` module, the CLI, and `start`. Application code inherits it,
+because every graph begins at one of those entries and resolves one Effect instance. Compilation is
+lazy, and a realm that blocks dynamic function construction, such as a page under a Content Security
+Policy without `unsafe-eval`, reports the blocked construction and parses through the interpreter.
+
 ## Application build
 
 `ersc build` runs a direct Rspack MultiCompiler with browser and server configurations. Rspack's RSC

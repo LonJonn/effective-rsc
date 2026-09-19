@@ -78,6 +78,7 @@ entry; read Git history for what it said.
 | D-072 | Require never errors in Server Function handlers and returned Streams. Expected outcomes are success values; client failures use ServerFnInputError, ServerFnDefect, or ServerFnTransportError. This is an ERSC contract, not a React limitation.                                                                                                              |
 | D-073 | Use QUERY /_ersc/query for result-only Server Function reads, preserving native React encoding and Flight. Client Effect/Stream and atom helpers cancel reads without refreshing routes. Top-level Effect Streams map to Web Streams; mixed stream/value outputs are rejected. The request owns the stream producer and awaits its finalizers on cancellation. |
 | D-074 | Treat Tailwind CSS v4 as an optional application toolchain: configure `@tailwindcss/webpack` from the application's own installation when it and `tailwindcss` are both declared dependencies, warn when only one is declared, and otherwise compile stylesheets natively.                                                                                     |
+| D-075 | Enable Effect Schema JIT compilation globally through a side-effect import at every framework entry: the browser entry, the `'use server-entry'` module, the CLI, and `start`. Compilation stays lazy and falls back to the interpreter wherever dynamic function construction is blocked.                                                                     |
 
 ## Deferred
 
