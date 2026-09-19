@@ -1,5 +1,6 @@
+import * as BunServices from '@effect/platform-bun/BunServices';
 import { expect, it } from '@effect/vitest';
-import { Effect, Exit, Logger, Option, Path, Stream } from 'effect';
+import { Effect, Exit, Logger, Option, Stream } from 'effect';
 import { vi } from 'vitest';
 
 const Mocks = vi.hoisted(() => ({ rspack: vi.fn(), deployment: vi.fn() }));
@@ -128,7 +129,7 @@ for (const outcome of ['NoAdapter', 'Success', 'CompilerFailure', 'AdapterFailur
       expect(Mocks.deployment).toHaveBeenCalledTimes(
         outcome === 'Success' || outcome === 'AdapterFailure' ? 1 : 0,
       );
-    }).pipe(Effect.withLogger(logger), Effect.provide(Path.layer));
+    }).pipe(Effect.withLogger(logger), Effect.provide(BunServices.layer));
   });
 }
 

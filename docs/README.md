@@ -10,8 +10,11 @@ READMEs own their local setup and operational notes.
 
 Edit public documentation under `packages/effective-rsc/docs`, then run `bun run docs:generate`.
 Its examples are type-checked; `LLMS.md` and the documentation site consume the same sources. Do not
-hand-edit generated output. Keep relative public-doc links below `<!-- source-navigation -->` so
-`LLMS.md` can generate its own links. Preserve page paths and decision/question IDs when reorganizing.
+hand-edit generated output. `LLMS.md` indexes every `index.md` using its opening heading and directory
+order, with links relative to the installed package. API pages start with a short blockquote explaining
+when to use the primitive; the index includes that description. Full prose and examples stay in their
+owning pages. Keep related links below `<!-- source-navigation -->`. Preserve page paths and
+decision/question IDs when reorganizing.
 
 ## Status
 

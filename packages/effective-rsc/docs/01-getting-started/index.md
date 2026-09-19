@@ -11,13 +11,19 @@ bun run dev
 Open `http://localhost:18193`. Omit the directory to use the interactive prompt; pass `--no-install`
 to install dependencies yourself.
 
+The scaffold pins the framework and its runtime peers to exact compatible versions. Upgrade them
+together. TypeScript and type definitions allow patch updates. Commit `bun.lock` to preserve
+transitive dependency versions.
+
 The application entry is `src/application.tsx`. It defines a root Layout containing the HTML
 document, attaches Pages to Routes, and exports `ERSC.make(...)`. Other filenames are yours to choose.
 
 ### Styles and assets
 
-Import CSS from the module that uses it. The starter's `src/styles.css` includes Tailwind; plain CSS
-works too. Imported images, fonts, and media resolve to built asset URLs. Reference
+Import CSS from the module that uses it. Plain CSS compiles natively. Tailwind CSS v4 is optional and
+configures itself: install `tailwindcss` and `@tailwindcss/webpack` together, on the same version, and
+the compiler applies Tailwind to every stylesheet. The starter installs both, and its `src/styles.css`
+imports Tailwind. Imported images, fonts, and media resolve to built asset URLs. Reference
 `effective-rsc/types` in `src/environment.d.ts` so TypeScript recognizes these imports.
 Files in `public/` are served from `/`.
 
@@ -41,5 +47,4 @@ defaults are `localhost` and `18193`.
 
 ### Related
 
-- [Manual installation](./02-manual-installation/index.md)
 - [Production startup](../03-advanced/04-production-startup/index.md)

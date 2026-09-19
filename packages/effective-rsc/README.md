@@ -18,12 +18,12 @@
 An experimental, Effect-native React Server Components framework for Bun. Built on Rspack's
 native RSC support.
 
-> Experimental. Uses React Canary, Effect v4 RC, TypeScript 7, Rspack's RSC support, and modern
+> Experimental. Uses React 19, Effect v4 RC, TypeScript 7, Rspack's RSC support, and modern
 > browser APIs. [Current limitations](https://github.com/nikhilsnayak/effective-rsc/blob/main/docs/ARCHITECTURE.md#known-limitations).
 
 ## Create an application
 
-Requires Bun 1.4 or newer. The scaffold installs compatible React Canary and Effect dependencies.
+Requires Bun 1.4 or newer. The scaffold installs exact compatible React and Effect dependencies.
 
 ```sh
 bunx create-ersc-app my-application

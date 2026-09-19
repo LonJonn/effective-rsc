@@ -92,6 +92,7 @@ it.effect(
               rsc: path.join(frameworkDist, 'build/rsc-entry.js'),
               ssr: path.join(frameworkDist, 'server/html-renderer.js'),
             },
+            null,
             { onCompilationStart, onServerComponentChanges },
           ),
         )
@@ -161,12 +162,16 @@ it.effect(
 
       const rspack = yield* Rspack;
       yield* rspack.build(
-        makeRspackBuildConfig(directory, {
-          application,
-          client: path.join(frameworkDist, 'client/entry.js'),
-          rsc: path.join(frameworkDist, 'build/rsc-entry.js'),
-          ssr: path.join(frameworkDist, 'server/html-renderer.js'),
-        }),
+        makeRspackBuildConfig(
+          directory,
+          {
+            application,
+            client: path.join(frameworkDist, 'client/entry.js'),
+            rsc: path.join(frameworkDist, 'build/rsc-entry.js'),
+            ssr: path.join(frameworkDist, 'server/html-renderer.js'),
+          },
+          null,
+        ),
       );
 
       const bundle = yield* loadCompiledServer(directory);

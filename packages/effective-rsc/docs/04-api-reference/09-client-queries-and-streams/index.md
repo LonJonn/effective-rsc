@@ -1,5 +1,7 @@
 ## Client queries and streams
 
+> Use query helpers to read server data without refreshing the page, stream helpers for incoming chunks, and atom helpers to display those results in React.
+
 Import `ServerFn` from `effective-rsc/client` to query a Server Function for a value or consume its
 stream. The helpers expose results as Effects, Streams, or atoms, with typed failures and cancellation.
 

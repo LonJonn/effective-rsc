@@ -1,5 +1,7 @@
 ## Application
 
+> Use Application to connect your routes and shared services in `src/application.tsx`.
+
 `Application.ersc<Services>()` creates the application's authoring API. Declare the application
 service union in `Services`, or omit it when no services are needed. Create all application values
 from this instance or its `withMiddleware` views.

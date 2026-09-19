@@ -11,7 +11,7 @@ export class VercelBuildError extends Schema.TaggedError<VercelBuildError>()('Ve
   cause: Schema.Defect(),
 }) {}
 
-const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 export const commonDirectory = (
   path: Path.Path,
@@ -131,6 +131,9 @@ export const packageForVercel = Effect.fn('@ersc/vercel/packageForVercel')(funct
   // A .func directory must contain every runtime file: https://vercel.com/docs/build-output-api/primitives#functions
   const functionDirectory = path.join(output, 'functions/index.func');
   const moduleSpecifier = path.relative(bootDirectory, frameworkEntry).split(path.sep).join('/');
+  const encodedModuleSpecifier = yield* encodeJson(
+    moduleSpecifier.startsWith('.') ? moduleSpecifier : `./${moduleSpecifier}`,
+  );
 
   yield* fs.makeDirectory(bootDirectory, { recursive: true });
   // Bun.serve entrypoints: https://vercel.com/docs/functions/runtimes/bun#deploy-with-the-bun-framework-preset
@@ -141,7 +144,7 @@ export const packageForVercel = Effect.fn('@ersc/vercel/packageForVercel')(funct
     `import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 process.chdir(root);
-const { start } = await import(${encodeJson(moduleSpecifier.startsWith('.') ? moduleSpecifier : `./${moduleSpecifier}`)});
+const { start } = await import(${encodedModuleSpecifier});
 // Hostname and port are local-only; Vercel handles incoming traffic.
 await start({ root, hostname: 'localhost', port: 18193 });
 `,
@@ -199,19 +202,18 @@ await start({ root, hostname: 'localhost', port: 18193 });
     }
   }
   // Function config and launcher: https://vercel.com/docs/build-output-api/primitives#serverless-function-configuration
-  yield* fs.writeFileString(
-    path.join(functionDirectory, '.vc-config.json'),
-    encodeJson({
-      // Bun runtime series: https://vercel.com/docs/functions/runtimes/bun#configuring-the-runtime
-      runtime: 'bun1.4.x',
-      handler: path.relative(base, bootFile).split(path.sep).join('/'),
-      launcherType: 'Nodejs',
-      shouldAddHelpers: false,
-    }),
-  );
+  const functionConfig = yield* encodeJson({
+    // Bun runtime series: https://vercel.com/docs/functions/runtimes/bun#configuring-the-runtime
+    runtime: 'bun1.4.x',
+    handler: path.relative(base, bootFile).split(path.sep).join('/'),
+    launcherType: 'Nodejs',
+    shouldAddHelpers: false,
+  });
+  yield* fs.writeFileString(path.join(functionDirectory, '.vc-config.json'), functionConfig);
   // Route all methods through the app: https://vercel.com/docs/build-output-api/configuration#routes
-  yield* fs.writeFileString(
-    path.join(output, 'config.json'),
-    encodeJson({ version: 3, routes: [{ src: '/(.*)', dest: '/index' }] }),
-  );
+  const outputConfig = yield* encodeJson({
+    version: 3,
+    routes: [{ src: '/(.*)', dest: '/index' }],
+  });
+  yield* fs.writeFileString(path.join(output, 'config.json'), outputConfig);
 });

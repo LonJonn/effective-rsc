@@ -3,7 +3,7 @@
 ## Purpose — Accepted
 
 effective-rsc researches an RSC framework where React owns the UI protocol and Effect owns the
-application runtime. It offers no production-safety guarantee and uses React Canary, Effect v4 RC,
+application runtime. It offers no production-safety guarantee and uses React 19, Effect v4 RC,
 TypeScript 7, Rspack RSC support, and new browser APIs without legacy fallbacks.
 
 ## Principles — Accepted

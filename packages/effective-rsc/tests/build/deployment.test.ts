@@ -4,7 +4,7 @@ import { Effect, Exit, FileSystem, Logger, Path, Schema } from 'effect';
 
 import { runDeploymentBuild } from '../../src/build/deployment';
 
-const json = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
+const json = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const fixture = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -14,22 +14,23 @@ const fixture = Effect.gen(function* () {
     yield* fs.makeDirectory(path.dirname(file), { recursive: true });
     yield* fs.writeFileString(file, contents);
   });
-  const manifest = (value: unknown) => write(path.join(root, 'package.json'), json(value));
+  const manifest = Effect.fnUntraced(function* (value: unknown) {
+    const encoded = yield* json(value);
+    yield* write(path.join(root, 'package.json'), encoded);
+  });
   const install = Effect.fnUntraced(function* (
     name: string,
     metadata: Record<string, unknown>,
     source: string,
   ) {
     const directory = path.join(workspace, 'node_modules', name);
-    yield* write(
-      path.join(directory, 'package.json'),
-      json({
-        name,
-        type: 'module',
-        exports: { './build': './build.js' },
-        ...metadata,
-      }),
-    );
+    const encoded = yield* json({
+      name,
+      type: 'module',
+      exports: { './build': './build.js' },
+      ...metadata,
+    });
+    yield* write(path.join(directory, 'package.json'), encoded);
     yield* write(path.join(directory, 'build.js'), source);
   });
   const context = {
@@ -38,7 +39,9 @@ const fixture = Effect.gen(function* () {
     clientDir: path.join(root, '.ersc/client'),
     publicDir: path.join(root, 'public'),
   };
-  return { fs, path, root, write, manifest, install, context };
+  const effectModule = yield* json(import.meta.resolve('effect'));
+  const bunServicesModule = yield* json(import.meta.resolve('@effect/platform-bun/BunServices'));
+  return { fs, path, root, write, manifest, install, context, effectModule, bunServicesModule };
 });
 
 for (const outcome of ['Success', 'Failure'] as const) {
@@ -49,13 +52,13 @@ for (const outcome of ['Success', 'Failure'] as const) {
     });
 
     return Effect.gen(function* () {
-      const { manifest, install, context } = yield* fixture;
+      const { manifest, install, context, effectModule } = yield* fixture;
       yield* manifest({});
       yield* install(
         'deploy',
         {},
         `
-        import { Effect } from ${json(import.meta.resolve('effect'))};
+        import { Effect } from ${effectModule};
         export const build = () => Effect.gen(function* () {
           yield* Effect.addFinalizer(() => Effect.logInfo('Hook closed'));
           yield* Effect.logInfo('Hook running');
@@ -81,7 +84,8 @@ for (const outcome of ['Success', 'Failure'] as const) {
 
 it.effect('runs only the selected hoisted adapter without requiring a manifest marker', () =>
   Effect.gen(function* () {
-    const { fs, path, root, manifest, install, context } = yield* fixture;
+    const { fs, path, root, manifest, install, context, effectModule, bunServicesModule } =
+      yield* fixture;
     yield* manifest({
       dependencies: { '@test/deploy': '*', '@ersc/other': '*' },
       devDependencies: { '@test/deploy': '*' },
@@ -95,8 +99,8 @@ it.effect('runs only the selected hoisted adapter without requiring a manifest m
       '@test/deploy',
       {},
       `
-      import { Effect, FileSystem } from ${json(import.meta.resolve('effect'))};
-      import * as BunServices from ${json(import.meta.resolve('@effect/platform-bun/BunServices'))};
+      import { Effect, FileSystem } from ${effectModule};
+      import * as BunServices from ${bunServicesModule};
       export const build = (context) => Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const file = context.root + '/result';
@@ -117,14 +121,15 @@ it.effect('runs only the selected hoisted adapter without requiring a manifest m
 
 it.effect('runs a devDependency hook and releases its scope when it fails', () =>
   Effect.gen(function* () {
-    const { fs, path, root, manifest, install, context } = yield* fixture;
+    const { fs, path, root, manifest, install, context, effectModule, bunServicesModule } =
+      yield* fixture;
     yield* manifest({ devDependencies: { deploy: '*' } });
     yield* install(
       'deploy',
       {},
       `
-      import { Effect, FileSystem } from ${json(import.meta.resolve('effect'))};
-      import * as BunServices from ${json(import.meta.resolve('@effect/platform-bun/BunServices'))};
+      import { Effect, FileSystem } from ${effectModule};
+      import * as BunServices from ${bunServicesModule};
       export const build = ({ root }) => Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         yield* Effect.addFinalizer(() => fs.writeFileString(root + '/released', 'Closed'));
@@ -144,14 +149,15 @@ it.effect('runs a devDependency hook and releases its scope when it fails', () =
 
 it.effect('releases an interrupted deployment hook', () =>
   Effect.gen(function* () {
-    const { fs, path, root, manifest, install, context } = yield* fixture;
+    const { fs, path, root, manifest, install, context, effectModule, bunServicesModule } =
+      yield* fixture;
     yield* manifest({ devDependencies: { 'a-interrupted': '*' } });
     yield* install(
       'a-interrupted',
       {},
       `
-      import { Effect, FileSystem } from ${json(import.meta.resolve('effect'))};
-      import * as BunServices from ${json(import.meta.resolve('@effect/platform-bun/BunServices'))};
+      import { Effect, FileSystem } from ${effectModule};
+      import * as BunServices from ${bunServicesModule};
       export const build = ({ root }) => Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         yield* Effect.addFinalizer(() => fs.writeFileString(root + '/released', 'Closed'));

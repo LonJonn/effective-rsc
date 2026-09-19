@@ -1,5 +1,7 @@
 ## Routes
 
+> Use Routes to connect URLs to pages and group them under layouts, loading fallbacks, and middleware.
+
 `ERSC.Routes.make({ layout?, loading? })` creates a route scope. Its methods return new Routes:
 
 - `page(path, page)` adds a Page at an absolute Effect HTTP pattern. Parameter Schema keys must

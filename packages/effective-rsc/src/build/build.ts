@@ -4,6 +4,7 @@ import { ApplicationEntryPath, EnvironmentConfig, PublicAssetsDir } from './cont
 import { runDeploymentBuild } from './deployment';
 import { Rspack } from './rspack';
 import { makeRspackBuildConfig } from './rspack-config';
+import { resolveTailwindToolchain } from './tailwind';
 import { Terminal } from './terminal';
 
 export type BuildOptions = {
@@ -64,9 +65,10 @@ export const resolveApplicationBuild = Effect.fnUntraced(function* ({
 
 export const build = Effect.fn('ersc/rspack/build')(function* (options: BuildOptions) {
   const { applicationRoot, entries } = yield* resolveApplicationBuild(options);
+  const tailwind = yield* resolveTailwindToolchain(applicationRoot);
   const rspack = yield* Rspack;
 
-  yield* rspack.build(makeRspackBuildConfig(applicationRoot, entries));
+  yield* rspack.build(makeRspackBuildConfig(applicationRoot, entries, tailwind));
 });
 
 export const buildApplication = Effect.fn('ersc/build/buildApplication')(function* (

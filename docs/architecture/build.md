@@ -8,6 +8,13 @@ dependencies are embedded; React, React DOM, and Effect remain external peers. P
 point to built JavaScript, preserve RSC directives, and expose deliberate subpaths. The package also
 ships its source guides and generated `LLMS.md`.
 
+Effect Schema compiles through its JIT compiler in every graph. The registry is module state of one
+Effect instance, so each realm enables it at its own entry, ahead of any schema construction: the
+browser entry, the `'use server-entry'` module, the CLI, and `start`. Application code inherits it,
+because every graph begins at one of those entries and resolves one Effect instance. Compilation is
+lazy, and a realm that blocks dynamic function construction, such as a page under a Content Security
+Policy without `unsafe-eval`, reports the blocked construction and parses through the interpreter.
+
 ## Application build
 
 `ersc build` runs a direct Rspack MultiCompiler with browser and server configurations. Rspack's RSC
@@ -33,11 +40,15 @@ graph resolves the same URLs so a Server Component can reference one, without wr
 including stylesheets; applications reference it once. Anything else stays a conventional `public/`
 file.
 
-CSS remains in Rspack's pipeline, including Tailwind CSS v4 through `@tailwindcss/webpack`. The
-browser build owns every stylesheet asset. The server graph keeps its CSS modules so Rspack can order
-stylesheet metadata, but a pitching loader discards their bytes before Tailwind reads them, so one
-build never compiles the same stylesheet twice. `public/` is served at `/` by Effect
-`HttpStaticServer`; compiled assets are served below `/_ersc/assets`.
+CSS remains in Rspack's pipeline, and the browser build owns every stylesheet asset. Tailwind CSS v4
+is an application toolchain rather than a framework dependency: when the application declares both
+`tailwindcss` and `@tailwindcss/webpack`, the compiler configures that loader from the application's
+own installation and compiles stylesheets against the application root. Declaring one without the
+other warns and compiles natively; declaring neither compiles natively through Rspack. The server
+graph keeps its CSS modules so Rspack can order stylesheet metadata, but a pitching loader discards
+their bytes before any stylesheet is compiled, so one build never compiles the same stylesheet twice.
+`public/` is served at `/` by Effect `HttpStaticServer`; compiled assets are served below
+`/_ersc/assets`.
 
 Every compiled browser asset carries a content hash, so `/_ersc/assets` is served immutably from a
 build and unstored in development, where one output directory is reused across rebuilds. Requests
@@ -78,6 +89,30 @@ is public. Computed file reads may escape tracing; local databases are not made 
 Vercel project settings and deployment remain separate setup; see [the adapter README](../../packages/vercel/README.md).
 
 ## Releases
+
+### Dependency versions
+
+Peer ranges describe supported application versions; the template installs a tested release set.
+While the framework remains experimental, use these policies:
+
+- Pin React and React DOM to the same exact version, and `react-server-dom-rspack` to its own
+  compatible exact version. Use those pins in the catalog, framework peers, and template.
+- Pin Effect RC packages exactly and keep their release versions aligned. Upgrade the runtime peers
+  together and verify compilation, rendering, hydration, navigation, and Server Functions.
+- Pin the template's `effective-rsc` dependency to the CLI release. Keep the adapter's framework peer
+  as `workspace:*`, which publishes as the exact workspace version.
+- Use `~` ranges for TypeScript, `@types/*`, and the Tailwind packages in the catalog and template.
+  Keep `tailwindcss` and `@tailwindcss/webpack` on the same range: they release together, and the
+  framework declares neither, reading the application's dependencies and resolving the loader from
+  the application's own installation.
+- Pin framework compiler dependencies exactly. Independent stable UI and utility dependencies may
+  use `^` ranges when their public API compatibility is sufficient.
+
+Keep template versions aligned with the catalog. Commit application
+lockfiles to preserve transitive resolutions. Widen peer ranges only when compatibility has been
+established; a future stable Effect release does not automatically change the exact-peer policy.
+
+### Publication
 
 `bun run release <version>` checks aligned framework, adapter, CLI, and template versions,
 runs verification and package dry runs, then asks before publishing and pushing the release tag.

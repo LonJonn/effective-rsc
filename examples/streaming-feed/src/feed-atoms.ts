@@ -16,6 +16,9 @@ export const feedAtom = Atom.fn((_: void, atomCtx: Atom.FnContext) => {
     return Stream.succeed(current);
   }
   return readPage({ after: current.items.at(-1)?.id ?? 0 }).pipe(
-    Stream.scan(current, (page, item) => ({ ...page, items: [...page.items, item] })),
+    Stream.scan(
+      () => current,
+      (page, item) => ({ ...page, items: [...page.items, item] }),
+    ),
   );
 }).pipe(Atom.keepAlive);

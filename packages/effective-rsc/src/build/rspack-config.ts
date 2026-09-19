@@ -18,6 +18,7 @@ import {
   EnvironmentConfig,
   ServerEntryName,
 } from './contract';
+import type { TailwindToolchain } from './tailwind';
 
 export type RspackEntries = {
   readonly application: string;
@@ -32,7 +33,6 @@ export type RspackDevConfigOptions = {
 };
 
 const require = createRequire(import.meta.url);
-const TailwindLoaderPath = require.resolve('@tailwindcss/webpack');
 const IgnoreCssLoaderPath = require.resolve('./ignore-css-loader.js');
 const CacheDirectory = 'node_modules/.cache/ersc/rspack';
 const ConfigModulePath = fileURLToPath(import.meta.url);
@@ -130,19 +130,26 @@ const makeSwcRule = (
   };
 };
 
-const makeCssRule = (root: string, mode: Environment): RuleSetRule => ({
-  test: /\.css$/i,
-  type: 'css/auto',
-  use: [
-    {
-      loader: TailwindLoaderPath,
-      options: {
-        base: root,
-        optimize: mode === 'production' ? { minify: true } : false,
-      },
-    },
-  ],
-});
+const makeCssRule = (
+  root: string,
+  mode: Environment,
+  tailwind: TailwindToolchain | null,
+): RuleSetRule =>
+  tailwind === null
+    ? { test: /\.css$/i, type: 'css/auto' }
+    : {
+        test: /\.css$/i,
+        type: 'css/auto',
+        use: [
+          {
+            loader: tailwind.loader,
+            options: {
+              base: root,
+              optimize: mode === 'production' ? { minify: true } : false,
+            },
+          },
+        ],
+      };
 
 // Only the browser graph writes asset files. The server graph resolves the same URLs so Server
 // Components can reference them, which needs the browser's public path rather than its own.
@@ -196,6 +203,7 @@ const makeRspackConfig = (
   root: string,
   entries: RspackEntries,
   mode: Environment,
+  tailwind: TailwindToolchain | null,
   devOptions?: RspackDevConfigOptions,
 ): ReadonlyArray<Configuration> => {
   const { ClientPlugin, ServerPlugin } = rspack.experiments.rsc.createPlugins();
@@ -226,7 +234,7 @@ const makeRspackConfig = (
       },
       rules: [
         makeAssetRule('browser', mode),
-        makeCssRule(root, mode),
+        makeCssRule(root, mode, tailwind),
         makeSwcRule(root, 'browser', mode),
       ],
     },
@@ -359,11 +367,15 @@ const makeRspackConfig = (
   return [client, server];
 };
 
-export const makeRspackBuildConfig = (root: string, entries: RspackEntries) =>
-  makeRspackConfig(root, entries, 'production');
+export const makeRspackBuildConfig = (
+  root: string,
+  entries: RspackEntries,
+  tailwind: TailwindToolchain | null,
+) => makeRspackConfig(root, entries, 'production', tailwind);
 
 export const makeRspackDevConfig = (
   root: string,
   entries: RspackEntries,
+  tailwind: TailwindToolchain | null,
   options?: RspackDevConfigOptions,
-) => makeRspackConfig(root, entries, 'development', options);
+) => makeRspackConfig(root, entries, 'development', tailwind, options);

@@ -1,5 +1,7 @@
 ## Middleware
 
+> Use Middleware for authentication, request checks, or services needed by selected routes and Server Functions.
+
 `ERSC.Middleware.make(handler)` accepts an Effect HTTP middleware.
 `ERSC.withMiddleware(middleware)` returns a view of the same application with that middleware attached.
 

@@ -1,5 +1,7 @@
 ## Component
 
+> Use Component for a reusable Server Component that renders with Effect or reads services.
+
 `ERSC.Component.make({ render })` creates an Effectful Server Component. Props are inferred from
 `render`; required services must be available from the application or middleware. Use the component
 within your application's server-rendered tree.
