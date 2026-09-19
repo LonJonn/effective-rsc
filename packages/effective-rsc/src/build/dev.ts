@@ -24,6 +24,7 @@ import { makeDevChannel } from './dev-channel';
 import { makeDevSourceMapHttpEffect } from './dev-source-map';
 import { Rspack, type RspackError, type RspackWatchEvent } from './rspack';
 import { makeRspackDevConfig } from './rspack-config';
+import { resolveTailwindToolchain } from './tailwind';
 import { formatDuration, Terminal } from './terminal';
 
 type RspackCompilation = Extract<RspackWatchEvent, { readonly _tag: 'Compiled' }>;
@@ -173,6 +174,7 @@ export const makeDevApplication = Effect.fnUntraced(function* ({
   root,
 }: DevApplicationOptions) {
   const { applicationRoot, entries } = yield* resolveApplicationBuild({ root });
+  const tailwind = yield* resolveTailwindToolchain(applicationRoot);
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const rspack = yield* Rspack;
@@ -243,7 +245,7 @@ export const makeDevApplication = Effect.fnUntraced(function* ({
       const startup = yield* FiberHandle.make<void, DevGenerationFailure>();
       const events = rspack
         .watch(
-          makeRspackDevConfig(applicationRoot, entries, {
+          makeRspackDevConfig(applicationRoot, entries, tailwind, {
             onCompilationStart: channel.onCompilationStart,
             onServerComponentChanges: channel.onServerComponentChanges,
           }),

@@ -28,6 +28,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@playwright/test": "catalog:",
+    "@tailwindcss/webpack": "catalog:",
     "@types/bun": "catalog:",
     "@types/react": "catalog:",
     "tailwindcss": "catalog:",

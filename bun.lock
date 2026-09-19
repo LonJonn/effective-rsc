@@ -38,6 +38,7 @@
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "@playwright/test": "catalog:",
+        "@tailwindcss/webpack": "catalog:",
         "@types/bun": "catalog:",
         "@types/qrcode": "^1.5.5",
         "@types/react": "catalog:",
@@ -109,6 +110,7 @@
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "@playwright/test": "catalog:",
+        "@tailwindcss/webpack": "catalog:",
         "@types/bun": "catalog:",
         "@types/react": "catalog:",
         "tailwindcss": "catalog:",
@@ -149,7 +151,6 @@
       "dependencies": {
         "@rspack/core": "2.2.3",
         "@rspack/plugin-react-refresh": "2.0.2",
-        "@tailwindcss/webpack": "4.3.3",
         "react-refresh": "0.19.0",
       },
       "devDependencies": {
@@ -209,6 +210,7 @@
         "@effect/platform-browser": "catalog:",
         "@effect/platform-bun": "catalog:",
         "@sugar-high/react": "2.4.0",
+        "@tailwindcss/webpack": "catalog:",
         "@vercel/analytics": "2.0.1",
         "@vercel/speed-insights": "2.0.0",
         "class-variance-authority": "catalog:",
@@ -250,6 +252,7 @@
     "@effect/vitest": "4.0.0-rc.116",
     "@playwright/test": "1.63.0",
     "@rslib/core": "1.0.0",
+    "@tailwindcss/webpack": "~4.3.3",
     "@types/bun": "~1.4.2",
     "@types/react": "~19.3.0",
     "@types/react-dom": "~19.3.0",
@@ -260,7 +263,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-server-dom-rspack": "0.1.0",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "~4.3.3",
     "typescript": "~7.0.2",
     "vitest": "^5.0.1",
   },

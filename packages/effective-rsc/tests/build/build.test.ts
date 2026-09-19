@@ -14,6 +14,7 @@ import {
 } from '../../src/build/rspack-config';
 
 const BuildModuleUrl = new URL('file:///framework/dist/build/build.js');
+const Tailwind = { loader: '/workspace/node_modules/@tailwindcss/webpack/dist/index.js' };
 
 const resolveFixtureBuild = (root: string) =>
   resolveApplicationBuild({ buildModuleUrl: BuildModuleUrl, root });
@@ -72,7 +73,7 @@ const tailwindUseNamed = (config: Configuration) => {
 it.effect('uses real framework entries and private aliases for application source', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const configs = makeRspackBuildConfig(applicationRoot, entries);
+    const configs = makeRspackBuildConfig(applicationRoot, entries, Tailwind);
     const client = configNamed(configs, 'client');
     const server = configNamed(configs, 'server');
 
@@ -106,7 +107,7 @@ it.effect('resolves the server bundle where Rspack emits it', () =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const server = configNamed(makeRspackBuildConfig(applicationRoot, entries), 'server');
+    const server = configNamed(makeRspackBuildConfig(applicationRoot, entries, Tailwind), 'server');
     const serverEntries = server.entry as Record<string, unknown>;
     const serverEntryName = Object.keys(serverEntries)[0];
     const jsFilenameTemplate = server.output?.filename;
@@ -132,8 +133,8 @@ it.effect('content-addresses every compiled client asset in both modes', () =>
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
 
     for (const configs of [
-      makeRspackBuildConfig(applicationRoot, entries),
-      makeRspackDevConfig(applicationRoot, entries),
+      makeRspackBuildConfig(applicationRoot, entries, Tailwind),
+      makeRspackDevConfig(applicationRoot, entries, Tailwind),
     ]) {
       const { output } = configNamed(configs, 'client');
 
@@ -152,10 +153,11 @@ it.effect('content-addresses every compiled client asset in both modes', () =>
 it.effect('compiles Tailwind CSS against the application root in the browser graph', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const configs = makeRspackBuildConfig(applicationRoot, entries);
+    const configs = makeRspackBuildConfig(applicationRoot, entries, Tailwind);
     const client = configNamed(configs, 'client');
     const server = configNamed(configs, 'server');
 
+    expect(tailwindUseNamed(client)?.loader).toBe(Tailwind.loader);
     expect(tailwindUseNamed(client)?.options).toEqual({
       base: '/workspace',
       optimize: { minify: true },
@@ -169,10 +171,27 @@ it.effect('compiles Tailwind CSS against the application root in the browser gra
   }).pipe(Effect.provide(Path.layer)),
 );
 
+it.effect('compiles stylesheets natively when the application configures no Tailwind', () =>
+  Effect.gen(function* () {
+    const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
+    const configs = makeRspackBuildConfig(applicationRoot, entries, null);
+    const client = configNamed(configs, 'client');
+    const server = configNamed(configs, 'server');
+
+    expect(cssRuleLoaders(client)).toBeUndefined();
+    expect(client.module?.rules).toContainEqual({ test: /\.css$/i, type: 'css/auto' });
+
+    // The server graph still discards stylesheet bytes it never compiles.
+    expect(cssRuleLoaders(server)?.every((loader) => loader.includes('ignore-css-loader'))).toBe(
+      true,
+    );
+  }).pipe(Effect.provide(Path.layer)),
+);
+
 it.effect('points the server CSS rule at the framework pitching loader', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const server = configNamed(makeRspackBuildConfig(applicationRoot, entries), 'server');
+    const server = configNamed(makeRspackBuildConfig(applicationRoot, entries, Tailwind), 'server');
     const loaders = cssRuleLoaders(server) ?? [];
 
     expect(loaders).toHaveLength(1);
@@ -195,7 +214,7 @@ const assetRule = (config: Configuration) =>
 it.effect('emits imported assets from the browser graph only', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const configs = makeRspackBuildConfig(applicationRoot, entries);
+    const configs = makeRspackBuildConfig(applicationRoot, entries, Tailwind);
     const client = assetRule(configNamed(configs, 'client'));
     const server = assetRule(configNamed(configs, 'server'));
 
@@ -213,7 +232,7 @@ it.effect('emits imported assets from the browser graph only', () =>
 it.effect('matches images, fonts, and media as assets', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const configs = makeRspackBuildConfig(applicationRoot, entries);
+    const configs = makeRspackBuildConfig(applicationRoot, entries, Tailwind);
     const tests = assetRule(configNamed(configs, 'client'))?.test as ReadonlyArray<RegExp>;
     const matches = (name: string) => tests.some((pattern) => pattern.test(name));
 
@@ -237,7 +256,7 @@ it.effect('matches images, fonts, and media as assets', () =>
 it.effect('keeps development candidates immutable until they are published', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const configs = makeRspackDevConfig(applicationRoot, entries);
+    const configs = makeRspackDevConfig(applicationRoot, entries, Tailwind);
     const client = configNamed(configs, 'client');
     const server = configNamed(configs, 'server');
 
@@ -302,7 +321,7 @@ const DependencySource = '/workspace/node_modules/@effect/atom-react/dist/Hooks.
 it.effect('keeps the React Compiler out of the server compilation', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const configs = makeRspackBuildConfig(applicationRoot, entries);
+    const configs = makeRspackBuildConfig(applicationRoot, entries, Tailwind);
 
     expect(
       reactTransformOptions(configNamed(configs, 'client'), ApplicationSource)?.reactCompiler,
@@ -317,8 +336,8 @@ it.effect('limits the React Compiler to application src in production and develo
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
     const clients = [
-      configNamed(makeRspackBuildConfig(applicationRoot, entries), 'client'),
-      configNamed(makeRspackDevConfig(applicationRoot, entries), 'client'),
+      configNamed(makeRspackBuildConfig(applicationRoot, entries, Tailwind), 'client'),
+      configNamed(makeRspackDevConfig(applicationRoot, entries, Tailwind), 'client'),
     ];
     const dependencies = [
       DependencySource,
@@ -346,8 +365,8 @@ it.effect('limits the React Compiler to application src in production and develo
 it.effect('enables HMR and React Refresh only in the development browser graph', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const buildConfigs = makeRspackBuildConfig(applicationRoot, entries);
-    const devConfigs = makeRspackDevConfig(applicationRoot, entries);
+    const buildConfigs = makeRspackBuildConfig(applicationRoot, entries, Tailwind);
+    const devConfigs = makeRspackDevConfig(applicationRoot, entries, Tailwind);
     const buildClient = configNamed(buildConfigs, 'client');
     const buildServer = configNamed(buildConfigs, 'server');
     const devClient = configNamed(devConfigs, 'client');
@@ -411,7 +430,7 @@ it('bundles every other dependency, including the remaining peers', () => {
 it.effect('externalizes only in the server graph', () =>
   Effect.gen(function* () {
     const { applicationRoot, entries } = yield* resolveFixtureBuild('/workspace');
-    const configs = makeRspackBuildConfig(applicationRoot, entries);
+    const configs = makeRspackBuildConfig(applicationRoot, entries, Tailwind);
 
     expect(configNamed(configs, 'client').externals).toBeUndefined();
     expect(configNamed(configs, 'server').externals).toEqual([externalizeServerModule]);

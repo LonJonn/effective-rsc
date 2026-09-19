@@ -15,6 +15,7 @@
     "@effect/platform-browser": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@sugar-high/react": "2.4.0",
+    "@tailwindcss/webpack": "catalog:",
     "@vercel/analytics": "2.0.1",
     "@vercel/speed-insights": "2.0.0",
     "class-variance-authority": "catalog:",

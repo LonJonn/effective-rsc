@@ -48,6 +48,12 @@ describe('createApplication', () => {
     expect(TemplatePackageJson.devDependencies.tailwindcss).toBe(
       RootPackageJson.catalog.tailwindcss,
     );
+    expect(TemplatePackageJson.devDependencies['@tailwindcss/webpack']).toBe(
+      RootPackageJson.catalog['@tailwindcss/webpack'],
+    );
+    expect(TemplatePackageJson.devDependencies['@tailwindcss/webpack']).toBe(
+      TemplatePackageJson.devDependencies.tailwindcss,
+    );
     expect(TemplatePackageJson.devDependencies.typescript).toBe(RootPackageJson.catalog.typescript);
   });
 

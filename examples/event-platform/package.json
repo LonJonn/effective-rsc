@@ -29,6 +29,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@playwright/test": "catalog:",
+    "@tailwindcss/webpack": "catalog:",
     "@types/bun": "catalog:",
     "@types/qrcode": "^1.5.5",
     "@types/react": "catalog:",
