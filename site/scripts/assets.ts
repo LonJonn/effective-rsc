@@ -9,12 +9,12 @@ import { indexDocuments } from '../src/docs/files';
 import { robotsTxt, sitemapXml } from '../src/seo';
 
 const siteRoot = Bun.fileURLToPath(new URL('../', import.meta.url));
-const decodeManifest = Schema.decodeUnknownSync(Schema.Struct({ name: Schema.String }));
+const decodeManifest = Schema.decodeUnknownPromise(Schema.Struct({ name: Schema.String }));
 
 const findDocsPackageRoot = async (directory: string): Promise<string> => {
   const file = Bun.file(join(directory, 'package.json'));
   if (await file.exists()) {
-    if (decodeManifest(await file.json()).name === 'effective-rsc') {
+    if ((await decodeManifest(await file.json())).name === 'effective-rsc') {
       return directory;
     }
   }

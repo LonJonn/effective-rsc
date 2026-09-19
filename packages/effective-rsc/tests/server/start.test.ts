@@ -6,7 +6,7 @@ import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import { BuildServerBundlePath } from '../../src/build/contract';
 import { serve } from '../../src/server/serve';
 
-const quote = Schema.encodeSync(Schema.fromJsonString(Schema.String));
+const quote = Schema.encodeEffect(Schema.fromJsonString(Schema.String));
 
 it.effect('returns when initialized and retains application resources until its scope closes', () =>
   Effect.gen(function* () {
@@ -14,18 +14,20 @@ it.effect('returns when initialized and retains application resources until its 
     const path = yield* Path.Path;
     const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: 'ersc-start-scope-' });
     const marker = path.join(root, 'lifetime');
+    const effectModule = yield* quote(import.meta.resolve('effect'));
+    const encodedMarker = yield* quote(marker);
     const bundlePath = path.join(root, BuildServerBundlePath);
     yield* fileSystem.makeDirectory(path.dirname(bundlePath), { recursive: true });
     yield* fileSystem.writeFileString(
       bundlePath,
       `
-      import { Effect, Layer } from ${quote(import.meta.resolve('effect'))};
+      import { Effect, Layer } from ${effectModule};
       import { writeFileSync } from 'node:fs';
       export default { entryJsFiles: ['main.js'], entryCssFiles: [] };
       export const HttpLayer = Layer.empty;
       export const ServerLayer = Layer.effectDiscard(Effect.acquireRelease(
-        Effect.sync(() => writeFileSync(${quote(marker)}, 'Open')),
-        () => Effect.sync(() => writeFileSync(${quote(marker)}, 'Closed'))
+        Effect.sync(() => writeFileSync(${encodedMarker}, 'Open')),
+        () => Effect.sync(() => writeFileSync(${encodedMarker}, 'Closed'))
       ));
     `,
     );
@@ -78,35 +80,39 @@ it.effect('public start resolves after readiness and releases resources on SIGTE
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const root = yield* fs.makeTempDirectoryScoped({ prefix: 'ersc-public-start-' });
     const marker = path.join(root, 'lifetime');
+    const effectModule = yield* quote(import.meta.resolve('effect'));
+    const encodedMarker = yield* quote(marker);
     const bundlePath = path.join(root, BuildServerBundlePath);
     yield* fs.makeDirectory(path.dirname(bundlePath), { recursive: true });
     yield* fs.writeFileString(
       bundlePath,
       `
-import { Effect, Layer } from ${quote(import.meta.resolve('effect'))};
+import { Effect, Layer } from ${effectModule};
 import { writeFileSync } from 'node:fs';
 export default { entryJsFiles: ['main.js'], entryCssFiles: [] };
 export const HttpLayer = Layer.empty;
 export const ServerLayer = Layer.effectDiscard(Effect.acquireRelease(
   Effect.sync(() => {
     const server = Bun.serve({ port: 0, fetch: () => new Response('ready') });
-    writeFileSync(${quote(marker)}, 'Open');
+    writeFileSync(${encodedMarker}, 'Open');
     return server;
   }),
   (server) => Effect.sync(() => {
     server.stop(true);
-    writeFileSync(${quote(marker)}, 'Closed');
+    writeFileSync(${encodedMarker}, 'Closed');
   })
 ));
 `,
     );
     const entry = path.join(root, 'start.mjs');
+    const serverModule = yield* quote(import.meta.resolve('effective-rsc/server'));
+    const encodedRoot = yield* quote(root);
     yield* fs.writeFileString(
       entry,
       `
-import { start } from ${quote(import.meta.resolve('effective-rsc/server'))};
-await start({ root: ${quote(root)}, hostname: 'localhost', port: 0 });
-console.log('READY ' + await Bun.file(${quote(marker)}).text());
+import { start } from ${serverModule};
+await start({ root: ${encodedRoot}, hostname: 'localhost', port: 0 });
+console.log('READY ' + await Bun.file(${encodedMarker}).text());
 `,
     );
     const child = yield* spawner.spawn(ChildProcess.make('bun', [entry]));
@@ -133,12 +139,14 @@ it.effect('public start rejects and exits unsuccessfully when startup fails', ()
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const root = yield* fs.makeTempDirectoryScoped({ prefix: 'ersc-public-start-failure-' });
     const entry = path.join(root, 'start.mjs');
+    const serverModule = yield* quote(import.meta.resolve('effective-rsc/server'));
+    const encodedRoot = yield* quote(root);
     yield* fs.writeFileString(
       entry,
       `
-import { start } from ${quote(import.meta.resolve('effective-rsc/server'))};
+import { start } from ${serverModule};
 try {
-  await start({ root: ${quote(root)}, hostname: 'localhost', port: 0 });
+  await start({ root: ${encodedRoot}, hostname: 'localhost', port: 0 });
   console.log('UNEXPECTED READY');
 } catch {
   console.log('REJECTED');

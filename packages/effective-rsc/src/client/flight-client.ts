@@ -96,10 +96,9 @@ export class FlightClient extends Context.Service<FlightClient>()('ersc/client/F
             ? HttpClientRequest.get(flightRequest.destination).pipe(
                 HttpClientRequest.setHeader('accept', FlightMediaType),
               )
-            : HttpClientRequest.make(
-                // @ts-expect-error Effect's HttpMethod union predates RFC 10008 QUERY.
-                flightRequest._tag === 'Query' ? 'QUERY' : 'POST',
-              )(flightRequest.destination).pipe(
+            : HttpClientRequest.make(flightRequest._tag === 'Query' ? 'QUERY' : 'POST')(
+                flightRequest.destination,
+              ).pipe(
                 HttpClientRequest.setHeaders({
                   accept: FlightMediaType,
                   [ServerFnIdHeader]: flightRequest.id,

@@ -35,7 +35,7 @@ export const resolveDocument = <S extends Schema.Constraint>(
   toHref: (params: S['Type']) => string,
 ) =>
   Schema.decodeTo<typeof DocEntry, S, Docs>(DocEntry, {
-    decode: new SchemaGetter.Getter((input: Option.Option<S['Type']>) =>
+    decode: SchemaGetter.transformOptionalEffect((input: Option.Option<S['Type']>) =>
       Effect.map(Docs, ({ entries }) =>
         Option.flatMap(input, (params) =>
           Option.fromNullishOr(entries.find((entry) => entry.href === toHref(params))),

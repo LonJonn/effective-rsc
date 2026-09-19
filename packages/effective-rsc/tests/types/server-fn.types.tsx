@@ -84,6 +84,7 @@ ERSC.ServerFn.make({
 });
 ERSC.ServerFn.make({
   // @ts-expect-error Omitting input does not allow typed handler failures.
+  // oxlint-disable-next-line effecttsgo/missing-effect-error -- This negative type test deliberately returns an unhandled failure.
   handler: () => Effect.fail('failure'),
 });
 

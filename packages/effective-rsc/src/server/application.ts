@@ -317,29 +317,25 @@ const httpLayer = <Services, ApplicationError>(
 
         return Layer.mergeAll(PageLayer, ServerFnLayer);
       };
-      const QueryLayer = HttpRouter.add(
-        // @ts-expect-error Effect's HttpMethod union predates RFC 10008 QUERY.
-        'QUERY',
-        FrameworkQueryPath,
-        (request) =>
-          prepareServerFnQuery(request, identity).pipe(
-            Effect.flatMap((prepared) =>
-              applyMiddleware(
-                prepared.middleware,
-                prepared.execute.pipe(
-                  Effect.flatMap((outcome) => renderQuery(outcome, prepared.middleware)),
-                ),
-              ),
-            ),
-            Effect.catchTag('ServerFnRequestError', (error) =>
-              Effect.succeed(
-                HttpServerResponse.text(error.message, {
-                  headers: DynamicResponseHeaders,
-                  status: error.status,
-                }),
+      const QueryLayer = HttpRouter.add('QUERY', FrameworkQueryPath, (request) =>
+        prepareServerFnQuery(request, identity).pipe(
+          Effect.flatMap((prepared) =>
+            applyMiddleware(
+              prepared.middleware,
+              prepared.execute.pipe(
+                Effect.flatMap((outcome) => renderQuery(outcome, prepared.middleware)),
               ),
             ),
           ),
+          Effect.catchTag('ServerFnRequestError', (error) =>
+            Effect.succeed(
+              HttpServerResponse.text(error.message, {
+                headers: DynamicResponseHeaders,
+                status: error.status,
+              }),
+            ),
+          ),
+        ),
       ).pipe(Layer.provide(RequestContextMiddleware.layer));
       const [firstDestination, ...remainingDestinations] = applicationState.routes;
       return Layer.mergeAll(
