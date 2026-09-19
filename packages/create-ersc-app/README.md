@@ -9,9 +9,8 @@ bun run dev
 ```
 
 Open `http://localhost:18193`. The scaffold includes strict TypeScript, Tailwind in `src/styles.css`,
-and the exact Effect, React Canary, and `react-server-dom-rspack` versions tested with its framework
-release. Bun may report a React peer warning because `react-server-dom-rspack` declares stable peer
-ranges; retain the scaffolded compatible versions.
+and the exact Effect, React, and `react-server-dom-rspack` versions tested with its framework
+release.
 
 Omit the directory for an interactive prompt. Pass `--no-install` to create files without running
 `bun install`, or `--help` for all options.

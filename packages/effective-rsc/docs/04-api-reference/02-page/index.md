@@ -1,5 +1,7 @@
 ## Page
 
+> Use Page to render the content for a URL and read its path parameters.
+
 `ERSC.Page.make({ render })` defines a static Page. Add `params` to decode path parameters:
 `ERSC.Page.make({ params, render })`. Attach it with `routes.page(path, page)`.
 

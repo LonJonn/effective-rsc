@@ -1,5 +1,7 @@
 ## ServerFn
 
+> Use ServerFn to define server work called by browser code or submitted through a form.
+
 Export `ERSC.ServerFn.make({ input, handler })` from a `'use server'` module. It creates a native
 React Server Function: callers pass encoded Schema values; the Effect handler receives decoded
 values and may require application or middleware services. `input` is optional; omit it for a

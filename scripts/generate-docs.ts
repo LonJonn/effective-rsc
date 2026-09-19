@@ -1,129 +1,64 @@
 /* oxlint-disable effecttsgo/async-function, effecttsgo/node-builtin-import -- Standalone Bun documentation generator. */
 import { readdir } from 'node:fs/promises';
-import { basename, dirname, extname, join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 const repositoryRoot = Bun.fileURLToPath(new URL('../', import.meta.url));
 export const documentationRoot = join(repositoryRoot, 'packages/effective-rsc/docs');
 export const documentationOutput = join(repositoryRoot, 'packages/effective-rsc/LLMS.md');
 const documentationOutputDirectory = dirname(documentationOutput);
-const sourceNavigationMarker = '<!-- source-navigation -->';
 
-type Example = {
-  readonly content: string;
-  readonly description: string | undefined;
-  readonly fileName: string;
-  readonly title: string;
-};
-
-const readExample = async (path: string): Promise<Example> => {
-  let content = await Bun.file(path).text();
-  const fileName = basename(path, extname(path));
-  let title = fileName
-    .replace(/^\d+[-_]?/, '')
-    .replaceAll(/[-_]/g, ' ')
-    .replace(/^./, (character) => character.toUpperCase());
-  let description: string | undefined;
-
-  if (content.startsWith('/**')) {
-    const commentEnd = content.indexOf('*/');
-    if (commentEnd === -1) {
-      throw new Error(
-        `Unterminated leading documentation comment in ${relative(repositoryRoot, path)}.`,
-      );
-    }
-
-    const descriptionLines: Array<string> = [];
-    for (const line of content.slice(3, commentEnd).split('\n')) {
-      const value = line.replace(/^\s*\*?\s?/, '').trimEnd();
-      if (value.startsWith('@title ')) {
-        title = value.slice('@title '.length).trim();
-      } else if (value !== '') {
-        descriptionLines.push(value);
-      }
-    }
-    content = content.slice(commentEnd + 2);
-    description = descriptionLines.length === 0 ? undefined : descriptionLines.join('\n');
-  }
-
-  return { content: content.trim(), description, fileName, title };
-};
-
-const linkFromDocumentationOutput = (path: string) =>
-  `./${relative(documentationOutputDirectory, path).replaceAll('\\', '/')}`;
-
-const directoryToMarkdown = async (directory: string): Promise<string> => {
-  const index = Bun.file(join(directory, 'index.md'));
-  const indexContent = (await index.exists()) ? (await index.text()).trim() : '';
-  const [sharedIndex = ''] = indexContent.split(`\n${sourceNavigationMarker}\n`, 1);
-  const sharedIndexContent = sharedIndex.trim();
-  if (sharedIndexContent.includes('](./') || sharedIndexContent.includes('](../')) {
-    throw new Error(
-      `Move source-relative links below ${sourceNavigationMarker} in ${relative(repositoryRoot, directory)}/index.md.`,
-    );
-  }
-  const entries = (await readdir(directory, { withFileTypes: true }))
-    .filter((entry) => entry.name !== 'index.md')
-    .sort((left, right) => left.name.localeCompare(right.name));
-  const inlineExamples: Array<string> = [];
-  const linkedExamples: Array<string> = [];
-  const nestedSections: Array<string> = [];
-
-  for (const entry of entries) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      const section = await directoryToMarkdown(path);
-      if (section !== '') {
-        nestedSections.push(section);
-      }
-      continue;
-    }
-    if (entry.name.endsWith('.d.ts')) {
-      continue;
-    }
-    if (!['.ts', '.tsx'].includes(extname(entry.name).toLowerCase())) {
-      continue;
-    }
-
-    const example = await readExample(path);
-    if (example.fileName.startsWith('0')) {
-      const language = extname(entry.name) === '.tsx' ? 'tsx' : 'ts';
-      inlineExamples.push(
-        [
-          `### ${example.title}`,
-          example.description,
-          `\`\`\`${language}\n${example.content}\n\`\`\``,
-        ]
-          .filter((section) => section !== undefined && section !== '')
-          .join('\n\n'),
-      );
-      continue;
-    }
-
-    const link = `- **[${example.title}](${linkFromDocumentationOutput(path)})**`;
-    linkedExamples.push(
-      example.description === undefined
-        ? link
-        : `${link}: ${example.description.replaceAll('\n', '\n  ')}`,
-    );
-  }
-
+const directoryToMarkdown = async (directory: string, depth: number): Promise<string> => {
   const sections: Array<string> = [];
-  if (sharedIndexContent !== '') {
-    sections.push(sharedIndexContent);
-  }
-  sections.push(...inlineExamples);
-  if (linkedExamples.length > 0) {
+  const indexPath = join(directory, 'index.md');
+  const index = Bun.file(indexPath);
+  let childDepth = depth;
+
+  if (await index.exists()) {
+    const source = await index.text();
+    const heading = source.match(/^#{1,6} (.+)\r?\n/);
+    if (heading === null) {
+      throw new Error(`Missing documentation heading: ${relative(repositoryRoot, indexPath)}`);
+    }
+
+    const title = heading[1]!.trim();
+    const href = `./${relative(documentationOutputDirectory, indexPath).replaceAll('\\', '/')}`;
+    const link = `[${title}](${href})`;
+    // An opening blockquote describes when to use the documented API.
+    const summary = source
+      .slice(heading[0].length)
+      .trimStart()
+      .match(/^(?:> [^\r\n]+(?:\r?\n|$))+/)?.[0]
+      .replace(/^> /gm, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const entry = summary === undefined ? link : `${link}: ${summary}`;
+
     sections.push(
-      `${inlineExamples.length > 0 ? '### More examples\n\n' : ''}${linkedExamples.join('\n')}`,
+      depth === 0 ? link : depth === 1 ? `## ${link}` : `${'  '.repeat(depth - 2)}- ${entry}`,
     );
+    childDepth += 1;
   }
-  sections.push(...nestedSections);
-  return sections.filter((section) => section !== '').join('\n\n');
+
+  const entries = (await readdir(directory, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .sort((left, right) => left.name.localeCompare(right.name, 'en', { numeric: true }));
+  for (const entry of entries) {
+    const section = await directoryToMarkdown(join(directory, entry.name), childDepth);
+    if (section !== '') {
+      sections.push(section);
+    }
+  }
+
+  return sections.join(depth < 2 ? '\n\n' : '\n');
 };
 
 export const generateDocumentation = async () => {
-  const content = await directoryToMarkdown(documentationRoot);
-  return `<!-- Generated by scripts/generate-docs.ts. Do not edit directly. -->\n\n${content}\n`;
+  const index = await directoryToMarkdown(documentationRoot, 0);
+  return `${[
+    '# effective-rsc',
+    'Read the relevant docs before changing framework usage. Links point to documentation and examples shipped with this package version.',
+    index,
+  ].join('\n\n')}\n`;
 };
 
 const main = async () => {

@@ -79,6 +79,28 @@ Vercel project settings and deployment remain separate setup; see [the adapter R
 
 ## Releases
 
+### Dependency versions
+
+Peer ranges describe supported application versions; the template installs a tested release set.
+While the framework remains experimental, use these policies:
+
+- Pin React and React DOM to the same exact version, and `react-server-dom-rspack` to its own
+  compatible exact version. Use those pins in the catalog, framework peers, and template.
+- Pin Effect RC packages exactly and keep their release versions aligned. Upgrade the runtime peers
+  together and verify compilation, rendering, hydration, navigation, and Server Functions.
+- Pin the template's `effective-rsc` dependency to the CLI release. Keep the adapter's framework peer
+  as `workspace:*`, which publishes as the exact workspace version.
+- Use `~` ranges for TypeScript and `@types/*` in the catalog and template. Pin Tailwind exactly and
+  keep it aligned with the framework's `@tailwindcss/webpack` dependency.
+- Pin framework compiler dependencies exactly. Independent stable UI and utility dependencies may
+  use `^` ranges when their public API compatibility is sufficient.
+
+Keep template versions aligned with the catalog. Commit application
+lockfiles to preserve transitive resolutions. Widen peer ranges only when compatibility has been
+established; a future stable Effect release does not automatically change the exact-peer policy.
+
+### Publication
+
 `bun run release <version>` checks aligned framework, adapter, CLI, and template versions,
 runs verification and package dry runs, then asks before publishing and pushing the release tag.
 For releases from `main`, it then advances the site's tarball-pinned documentation dependency to the
