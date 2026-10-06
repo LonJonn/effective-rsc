@@ -2,12 +2,17 @@ import type { LayoutComponent } from './layout';
 import type { LoadingComponent } from './loading';
 import type { AnyMiddleware } from './middleware';
 import { getPageState, type PageImplementationState } from './page';
-import { type AbsolutePath, joinRoutePaths, validateUnreservedPath } from './route-path';
+import {
+  type AbsolutePath,
+  analyzeRoutePath,
+  joinRoutePaths,
+  validateUnreservedPath,
+} from './route-path';
 import { type AnyRoutes, getRoutesState } from './routes';
 
 export type RouteScope<Services> = {
   readonly id: string;
-  readonly layout: LayoutComponent<Services> | null;
+  readonly layout: LayoutComponent<Services, unknown> | null;
   readonly loading: LoadingComponent<Services> | null;
 };
 
@@ -15,6 +20,7 @@ export type CompiledDestination<Services> = {
   readonly middleware: ReadonlyArray<AnyMiddleware<Services>>;
   readonly page: PageImplementationState<Services>;
   readonly pattern: AbsolutePath;
+  readonly pageParameterNames: ReadonlyArray<string>;
   readonly scopes: ReadonlyArray<RouteScope<Services>>;
 };
 
@@ -73,14 +79,27 @@ export const compileRouteGraph = <Services>(
 
     for (const route of currentState.pages) {
       const pattern = joinRoutePaths(prefix, route.path);
+      const localPath = analyzeRoutePath(route.path);
       validateUnreservedPath(pattern);
       destinations.push(
-        Object.freeze({ middleware, page: getPageState(route.page), pattern, scopes }),
+        Object.freeze({
+          middleware,
+          page: getPageState(route.page),
+          pattern,
+          scopes,
+          pageParameterNames:
+            localPath._tag === 'ParameterFree' ? Object.freeze([]) : localPath.parameterNames,
+        }),
       );
     }
 
     for (const mount of currentState.mounts) {
-      visit(mount.routes, joinRoutePaths(prefix, mount.path), scopes, middleware);
+      visit(
+        mount.routes,
+        joinRoutePaths(prefix, mount.path),
+        scopes,
+        mount.middleware === null ? middleware : [...middleware, mount.middleware],
+      );
     }
   };
 

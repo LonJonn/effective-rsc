@@ -93,10 +93,17 @@ const withHarness = <A, E, R>(
   const RootLayout = ERSC.Layout.make({ render: ({ children }) => Effect.succeed(children) });
   const Loading = ERSC.Loading.make({ render: () => <p>Loading</p> });
   const app = ERSC.make({
-    routes: Scoped.Routes.make({ layout: RootLayout, loading: Loading }).page(
-      '/params/:slug',
-      Page,
-    ),
+    routes: Scoped.Routes.make({ layout: RootLayout, loading: Loading })
+      .page('/params/:slug', Page)
+      .mount('/orgs/:orgId', Scoped.Routes.make().page('/params/:slug', Page), {
+        params: Schema.Struct({ orgId: Schema.Literals(['acme']) }),
+        provide: ({ params }) =>
+          Effect.succeed(
+            Context.make(DecoderService, {
+              decode: (value) => decode(`${params.orgId}/${value}`),
+            }),
+          ),
+      }),
   });
   const config = Layer.succeed(
     ServerConfig,
@@ -240,5 +247,41 @@ describe('Page parameter request boundary', () => {
           }),
       );
     }),
+  );
+});
+
+it.effect('provides mount services before local Page decoding on GET and POST refresh', () => {
+  const decodes: Array<string> = [];
+  return withHarness(
+    (value) =>
+      Effect.sync(() => {
+        decodes.push(value);
+        return value;
+      }),
+    (call) =>
+      Effect.gen(function* () {
+        for (const method of ['GET', 'POST'] as const) {
+          const response = yield* call(
+            new Request(
+              'http://effective-rsc.test/orgs/acme/params/valid',
+              request('valid', method, FlightMediaType),
+            ),
+          );
+          expect(response.status).toBe(200);
+          const body = yield* Effect.promise(() => response.json());
+          expect(body.page).toBe('acme/valid');
+        }
+        expect(decodes).toEqual(['acme/valid', 'acme/valid']);
+        const invalid = yield* call(
+          new Request(
+            'http://effective-rsc.test/orgs/invalid/params/valid',
+            request('valid', 'GET', FlightMediaType),
+          ),
+        );
+        expect(invalid.status).toBe(404);
+        expect(invalid.headers.get('cache-control')).toBe('private, no-store');
+        expect(invalid.headers.get('vary')).toBe('Accept');
+        expect(decodes).toHaveLength(2);
+      }),
   );
 });

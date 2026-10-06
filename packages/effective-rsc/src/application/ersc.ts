@@ -33,32 +33,46 @@ type ApplicableMiddleware<AvailableServices, Value> = [
   ? unknown
   : never;
 
-export type ERSC<ApplicationServices, AvailableServices = ApplicationServices> = ERSCMember<
+export type ERSC<
   ApplicationServices,
-  'ERSC'
-> & {
+  AvailableServices = ApplicationServices,
+  Requirements = never,
+> = ERSCMember<ApplicationServices, 'ERSC'> & {
   readonly Component: ComponentFactory<ApplicationServices, AvailableServices>;
-  readonly Layout: LayoutFactory<ApplicationServices, AvailableServices>;
+  readonly Layout: LayoutFactory<ApplicationServices, AvailableServices, Requirements>;
   readonly Loading: LoadingFactory<ApplicationServices>;
   readonly Middleware: MiddlewareFactory<ApplicationServices, AvailableServices>;
-  readonly Page: PageFactory<ApplicationServices, AvailableServices>;
-  readonly Routes: RoutesFactory<ApplicationServices>;
-  readonly ServerFn: ServerFnFactory<ApplicationServices, AvailableServices>;
+  readonly Page: PageFactory<ApplicationServices, AvailableServices, Requirements>;
+  readonly Routes: RoutesFactory<ApplicationServices, AvailableServices, Requirements>;
+  readonly ServerFn: ServerFnFactory<ApplicationServices, AvailableServices, Requirements>;
   readonly make: ERSCMake<ApplicationServices>;
+  readonly withRequirements: <Required>() => ERSC<
+    ApplicationServices,
+    AvailableServices | Required,
+    Requirements | Exclude<Required, AvailableServices>
+  >;
   readonly withMiddleware: <Value extends AnyMiddleware<ApplicationServices>>(
     middleware: Value & ApplicableMiddleware<AvailableServices, Value>,
-  ) => ERSC<ApplicationServices, AvailableServices | MiddlewareProvidedServices<Value>>;
+  ) => ERSC<
+    ApplicationServices,
+    AvailableServices | MiddlewareProvidedServices<Value>,
+    Exclude<Requirements, MiddlewareProvidedServices<Value>>
+  >;
 };
 
-const makeERSC = <ApplicationServices, AvailableServices>(
+const makeERSC = <ApplicationServices, AvailableServices, Requirements = never>(
   identity: ERSCIdentity<ApplicationServices>,
   middleware: ReadonlyArray<AnyMiddleware<ApplicationServices>>,
   allocateRouteScopeId: () => number,
   make: ERSCMake<ApplicationServices>,
-): ERSC<ApplicationServices, AvailableServices> => {
+): ERSC<ApplicationServices, AvailableServices, Requirements> => {
   const withMiddleware = <Value extends AnyMiddleware<ApplicationServices>>(
     value: Value & ApplicableMiddleware<AvailableServices, Value>,
-  ): ERSC<ApplicationServices, AvailableServices | MiddlewareProvidedServices<Value>> => {
+  ): ERSC<
+    ApplicationServices,
+    AvailableServices | MiddlewareProvidedServices<Value>,
+    Exclude<Requirements, MiddlewareProvidedServices<Value>>
+  > => {
     getMiddlewareState(value);
     if (getERSCIdentity(value) !== identity) {
       throw new TypeError('Middleware was created by a different ERSC module.');
@@ -67,7 +81,11 @@ const makeERSC = <ApplicationServices, AvailableServices>(
       throw new TypeError('Middleware cannot appear twice in the same scope.');
     }
 
-    return makeERSC(identity, Object.freeze([...middleware, value]), allocateRouteScopeId, make);
+    return makeERSC<
+      ApplicationServices,
+      AvailableServices | MiddlewareProvidedServices<Value>,
+      Exclude<Requirements, MiddlewareProvidedServices<Value>>
+    >(identity, Object.freeze([...middleware, value]), allocateRouteScopeId, make);
   };
 
   return Object.freeze(
@@ -77,14 +95,33 @@ const makeERSC = <ApplicationServices, AvailableServices>(
           identity,
           middleware,
         ),
-        Layout: makeLayoutFactory<ApplicationServices, AvailableServices>(identity, middleware),
+        Layout: makeLayoutFactory<ApplicationServices, AvailableServices, Requirements>(
+          identity,
+          middleware,
+        ),
         Loading: makeLoadingFactory(identity),
         Middleware: makeMiddlewareFactory<ApplicationServices, AvailableServices>(identity),
-        Page: makePageFactory<ApplicationServices, AvailableServices>(identity, middleware),
-        Routes: makeRoutesFactory(identity, middleware, allocateRouteScopeId),
-        ServerFn: makeServerFnFactory<ApplicationServices, AvailableServices>(identity, middleware),
+        Page: makePageFactory<ApplicationServices, AvailableServices, Requirements>(
+          identity,
+          middleware,
+        ),
+        Routes: makeRoutesFactory<ApplicationServices, AvailableServices, Requirements>(
+          identity,
+          middleware,
+          allocateRouteScopeId,
+        ),
+        ServerFn: makeServerFnFactory<ApplicationServices, AvailableServices, Requirements>(
+          identity,
+          middleware,
+        ),
         make,
         withMiddleware,
+        withRequirements: <Required>() =>
+          makeERSC<
+            ApplicationServices,
+            AvailableServices | Required,
+            Requirements | Exclude<Required, AvailableServices>
+          >(identity, middleware, allocateRouteScopeId, make),
       },
       identity,
       'ERSC',

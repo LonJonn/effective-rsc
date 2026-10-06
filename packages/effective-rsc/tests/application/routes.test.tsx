@@ -130,9 +130,9 @@ describe('Routes', () => {
       ERSC.Routes.make().page('/users/:userId/:userId', HomePage),
     ).toThrow('Dynamic parameter names must be unique within a route');
     expect(() =>
-      // @ts-expect-error Exercise runtime validation for a dynamic mount prefix.
+      // @ts-expect-error A dynamic mount prefix requires an adapter.
       ERSC.Routes.make().mount('/:group', ERSC.Routes.make().page('/', HomePage)),
-    ).toThrow('Routes cannot be mounted beneath parameterized path "/:group".');
+    ).toThrow('Parameterized mount "/:group" requires a parameter Schema and service adapter.');
     expect(() =>
       ERSC.make({
         // @ts-expect-error Exercise runtime validation for the reserved framework namespace.

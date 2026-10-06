@@ -9,7 +9,7 @@
 | `effective-rsc/types`  | TypeScript declarations for stylesheet and asset imports |
 
 `Application.ersc<Services>()` returns `Page`, `Layout`, `Loading`, `Component`, `Middleware`,
-`Routes`, `ServerFn`, `withMiddleware`, and `make`. Create values from one instance and its derived
+`Routes`, `ServerFn`, `withMiddleware`, `withRequirements`, and `make`. Create values from one instance and its derived
 views. The package root is server-only; importing it from a Client Component throws.
 
 <!-- source-navigation -->

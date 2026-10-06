@@ -1,4 +1,5 @@
-import { type Types } from 'effect';
+import { Context, Effect, Schema, type Types } from 'effect';
+import { HttpRouter, HttpServerResponse } from 'effect/unstable/http';
 
 import {
   type ERSCIdentity,
@@ -11,8 +12,16 @@ import {
 } from './ersc-identity';
 import type { LayoutComponent } from './layout';
 import type { LoadingComponent } from './loading';
-import type { AnyMiddleware } from './middleware';
-import { type AnyPageDefinition, getPageState, type PageConcern } from './page';
+import { type AnyMiddleware, makeMiddlewareFactory } from './middleware';
+import {
+  type AnyPageDefinition,
+  getPageState,
+  type PageConcern,
+  type PageParamsSchema,
+  type PageParamKeys,
+  type ValidPageParamsSchema,
+} from './page';
+import type { RequirementsOf, ServiceRequirements } from './requirements';
 import {
   type AbsolutePath,
   analyzeRoutePath,
@@ -72,6 +81,31 @@ type StaticMountPath<Path extends AbsolutePath> = [RouteParamNames<Path>] extend
   ? unknown
   : never;
 
+type MountAdapter<Services, Params extends PageParamsSchema<Services>, Provided> = {
+  readonly params: Params;
+  readonly provide: (props: {
+    readonly params: Params['Type'];
+  }) => Effect.Effect<Context.Context<Provided>, never, Services>;
+};
+
+type MatchingMountParams<Path extends AbsolutePath, Params> = [RouteParamNames<Path>] extends [
+  PageParamKeys<Params>,
+]
+  ? [PageParamKeys<Params>] extends [RouteParamNames<Path>]
+    ? [RouteParamNames<Path>] extends [never]
+      ? unknown
+      : ValidPageParamsSchema<Params>
+    : never
+  : never;
+
+type ValidMountedPaths<Prefix extends AbsolutePath, Child> = [
+  InvalidMountedPath<MountedPaths<Prefix, Child>>,
+] extends [never]
+  ? unknown
+  : never;
+type InvalidMountedPath<Path extends AbsolutePath> =
+  Path extends ValidRoutePath<Path> ? never : Path;
+
 type KnownNonEmptyRoutes<Definition> =
   AbsolutePath extends RoutesPaths<Definition>
     ? never
@@ -85,36 +119,94 @@ export interface RoutesDefinition<
   out Paths extends AbsolutePath,
   // Retain each matcher shape so additions do not recompute every earlier path's shape.
   out Shapes extends AbsolutePath = RouteShape<Paths>,
-> extends ERSCStatefulMember<Services, 'Routes', RoutesImplementationState<Services>> {
+  out Requirements = never,
+  AvailableServices = Services,
+>
+  extends
+    ERSCStatefulMember<Services, 'Routes', RoutesImplementationState<Services>>,
+    ServiceRequirements<Requirements> {
   readonly [RoutesContractTypeId]: RoutesState<HasLayout, Paths, Shapes>;
 
   page<const Path extends AbsolutePath, const Page extends AnyPageDefinition<Services>>(
     path: Path & ValidRoutePath<Path> & NoPathCollision<Shapes, Path>,
     page: Page & MatchingPageParams<Path, Page>,
-  ): RoutesDefinition<Services, HasLayout, Paths | Path, Shapes | RouteShape<Path>>;
+  ): RoutesDefinition<
+    Services,
+    HasLayout,
+    Paths | Path,
+    Shapes | RouteShape<Path>,
+    Requirements | Exclude<RequirementsOf<Page>, AvailableServices>,
+    AvailableServices
+  >;
 
   mount<const Prefix extends AbsolutePath, const Child extends AnyRoutes<Services>>(
     path: Prefix & ValidRoutePath<Prefix> & StaticMountPath<Prefix>,
     routes: Child &
       KnownNonEmptyRoutes<Child> &
-      NoPathCollision<Shapes, MountedPaths<Prefix, Child>>,
+      NoPathCollision<Shapes, MountedPaths<Prefix, Child>> &
+      ValidMountedPaths<Prefix, Child>,
   ): RoutesDefinition<
     Services,
     HasLayout,
     Paths | MountedPaths<Prefix, Child>,
-    Shapes | RouteShape<MountedPaths<Prefix, Child>>
+    Shapes | RouteShape<MountedPaths<Prefix, Child>>,
+    Requirements | Exclude<RequirementsOf<Child>, AvailableServices>,
+    AvailableServices
+  >;
+
+  mount<
+    const Prefix extends AbsolutePath,
+    const Child extends AnyRoutes<Services>,
+    Params extends PageParamsSchema<AvailableServices>,
+    Provided,
+  >(
+    path: Prefix & ValidRoutePath<Prefix>,
+    routes: Child &
+      KnownNonEmptyRoutes<Child> &
+      NoPathCollision<Shapes, MountedPaths<Prefix, Child>> &
+      ValidMountedPaths<Prefix, Child>,
+    adapter: MountAdapter<AvailableServices, Params, Provided> &
+      MatchingMountParams<Prefix, Params>,
+  ): RoutesDefinition<
+    Services,
+    HasLayout,
+    Paths | MountedPaths<Prefix, Child>,
+    Shapes | RouteShape<MountedPaths<Prefix, Child>>,
+    Requirements | Exclude<RequirementsOf<Child>, AvailableServices | Provided>,
+    AvailableServices
   >;
 }
 
-export type AnyRoutes<Services> = RoutesDefinition<Services, boolean, AbsolutePath>;
+export type AnyRoutes<Services> = RoutesDefinition<
+  Services,
+  boolean,
+  AbsolutePath,
+  AbsolutePath,
+  unknown,
+  unknown
+>;
 
 export type RoutesHasLayout<Definition> =
-  Definition extends RoutesDefinition<infer _Services, infer HasLayout, infer _Paths, infer _Shapes>
+  Definition extends RoutesDefinition<
+    infer _Services,
+    infer HasLayout,
+    infer _Paths,
+    infer _Shapes,
+    infer _Requirements,
+    infer _Available
+  >
     ? HasLayout
     : never;
 
 export type RoutesPaths<Definition> =
-  Definition extends RoutesDefinition<infer _Services, infer _HasLayout, infer Paths, infer _Shapes>
+  Definition extends RoutesDefinition<
+    infer _Services,
+    infer _HasLayout,
+    infer Paths,
+    infer _Shapes,
+    infer _Requirements,
+    infer _Available
+  >
     ? Paths
     : never;
 
@@ -126,10 +218,11 @@ type RoutesPage<Services> = {
 type RoutesMount<Services> = {
   readonly path: AbsolutePath;
   readonly routes: AnyRoutes<Services>;
+  readonly middleware: AnyMiddleware<Services> | null;
 };
 
 export type RoutesImplementationState<Services> = {
-  readonly layout: LayoutComponent<Services> | null;
+  readonly layout: LayoutComponent<Services, unknown> | null;
   readonly loading: LoadingComponent<Services> | null;
   readonly middleware: ReadonlyArray<AnyMiddleware<Services>>;
   readonly mounts: ReadonlyArray<RoutesMount<Services>>;
@@ -139,7 +232,7 @@ export type RoutesImplementationState<Services> = {
 };
 
 type RoutesOptions<Services> = {
-  readonly layout?: LayoutComponent<Services>;
+  readonly layout?: LayoutComponent<Services, unknown>;
   readonly loading?: LoadingComponent<Services>;
 };
 
@@ -154,7 +247,9 @@ class RoutesDefinitionImpl<
   HasLayout extends boolean,
   Paths extends AbsolutePath,
   Shapes extends AbsolutePath = RouteShape<Paths>,
-> implements RoutesDefinition<Services, HasLayout, Paths, Shapes> {
+  Requirements = never,
+  AvailableServices = Services,
+> implements RoutesDefinition<Services, HasLayout, Paths, Shapes, Requirements, AvailableServices> {
   declare readonly [RoutesContractTypeId]: RoutesState<HasLayout, Paths, Shapes>;
   readonly [ERSCIdentityTypeId]: ERSCIdentity<Services>;
   readonly [ERSCMemberKindTypeId] = 'Routes' as const;
@@ -162,7 +257,7 @@ class RoutesDefinitionImpl<
     return this;
   }
 
-  readonly layout: LayoutComponent<Services> | null;
+  readonly layout: LayoutComponent<Services, unknown> | null;
   readonly loading: LoadingComponent<Services> | null;
   readonly middleware: ReadonlyArray<AnyMiddleware<Services>>;
   readonly mounts: ReadonlyArray<RoutesMount<Services>>;
@@ -199,7 +294,14 @@ class RoutesDefinitionImpl<
   page<const Path extends AbsolutePath, const Page extends AnyPageDefinition<Services>>(
     path: Path & ValidRoutePath<Path> & NoPathCollision<Shapes, Path>,
     page: Page & MatchingPageParams<Path, Page>,
-  ): RoutesDefinitionImpl<Services, HasLayout, Paths | Path, Shapes | RouteShape<Path>> {
+  ): RoutesDefinitionImpl<
+    Services,
+    HasLayout,
+    Paths | Path,
+    Shapes | RouteShape<Path>,
+    Requirements | Exclude<RequirementsOf<Page>, AvailableServices>,
+    AvailableServices
+  > {
     const route = analyzeRoutePath(path);
     if (this.#routeShapes.has(route.shape)) {
       throw new TypeError(`Route "${path}" conflicts with an existing route pattern.`);
@@ -235,17 +337,72 @@ class RoutesDefinitionImpl<
     path: Prefix & ValidRoutePath<Prefix> & StaticMountPath<Prefix>,
     routes: Child &
       KnownNonEmptyRoutes<Child> &
-      NoPathCollision<Shapes, MountedPaths<Prefix, Child>>,
-  ): RoutesDefinitionImpl<
+      NoPathCollision<Shapes, MountedPaths<Prefix, Child>> &
+      ValidMountedPaths<Prefix, Child>,
+  ): RoutesDefinition<
     Services,
     HasLayout,
     Paths | MountedPaths<Prefix, Child>,
-    Shapes | RouteShape<MountedPaths<Prefix, Child>>
-  > {
+    Shapes | RouteShape<MountedPaths<Prefix, Child>>,
+    Requirements | Exclude<RequirementsOf<Child>, AvailableServices>,
+    AvailableServices
+  >;
+
+  mount<
+    const Prefix extends AbsolutePath,
+    const Child extends AnyRoutes<Services>,
+    Params extends PageParamsSchema<AvailableServices>,
+    Provided,
+  >(
+    path: Prefix & ValidRoutePath<Prefix>,
+    routes: Child &
+      KnownNonEmptyRoutes<Child> &
+      NoPathCollision<Shapes, MountedPaths<Prefix, Child>> &
+      ValidMountedPaths<Prefix, Child>,
+    adapter: MountAdapter<AvailableServices, Params, Provided> &
+      MatchingMountParams<Prefix, Params>,
+  ): RoutesDefinition<
+    Services,
+    HasLayout,
+    Paths | MountedPaths<Prefix, Child>,
+    Shapes | RouteShape<MountedPaths<Prefix, Child>>,
+    Requirements | Exclude<RequirementsOf<Child>, AvailableServices | Provided>,
+    AvailableServices
+  >;
+  mount<Params extends PageParamsSchema<AvailableServices>, Provided>(
+    path: AbsolutePath,
+    routes: AnyRoutes<Services>,
+    adapter?: MountAdapter<AvailableServices, Params, Provided>,
+  ): unknown {
     const route = analyzeRoutePath(path);
-    if (route._tag === 'Parameterized') {
-      throw new TypeError(`Routes cannot be mounted beneath parameterized path "${path}".`);
+    if (route._tag === 'Parameterized' && adapter === undefined) {
+      throw new TypeError(
+        `Parameterized mount "${path}" requires a parameter Schema and service adapter.`,
+      );
     }
+    const mountMiddleware =
+      adapter === undefined
+        ? null
+        : makeMiddlewareFactory<Services, AvailableServices>(this[ERSCIdentityTypeId]).make<{
+            provides: Provided;
+          }>((httpEffect) =>
+            Effect.gen(function* () {
+              const allParams = yield* HttpRouter.params;
+              const names = route._tag === 'Parameterized' ? route.parameterNames : [];
+              const params = Object.fromEntries(names.map((name) => [name, allParams[name]]));
+              const decoded = yield* Schema.decodeEffect(adapter.params)(params).pipe(
+                Effect.option,
+              );
+              if (decoded._tag === 'None') {
+                return HttpServerResponse.empty({
+                  status: 404,
+                  headers: { 'cache-control': 'private, no-store', vary: 'Accept' },
+                });
+              }
+              const context = yield* adapter.provide({ params: decoded.value });
+              return yield* httpEffect.pipe(Effect.provideContext(context));
+            }),
+          );
     const routesState = getRoutesState(routes);
     if (routesState.paths.length === 0) {
       throw new TypeError(`Cannot mount empty Routes at "${path}".`);
@@ -268,7 +425,10 @@ class RoutesDefinitionImpl<
       layout: this.layout,
       loading: this.loading,
       middleware: this.middleware,
-      mounts: Object.freeze([...this.mounts, Object.freeze({ path, routes })]),
+      mounts: Object.freeze([
+        ...this.mounts,
+        Object.freeze({ path, routes, middleware: mountMiddleware }),
+      ]),
       pages: this.pages,
       paths: Object.freeze([...this.paths, ...mountedPaths]),
       routeShapes,
@@ -286,24 +446,46 @@ export const getRoutesState = <Services>(
   return routes[ERSCStateTypeId];
 };
 
-export type RoutesFactory<Services> = {
+export type RoutesFactory<Services, AvailableServices = Services, Requirements = never> = {
   readonly make: {
-    (): RoutesDefinition<Services, false, never>;
+    (): RoutesDefinition<Services, false, never, never, Requirements, AvailableServices>;
     <Options extends RoutesOptions<Services>>(
       options: Options,
-    ): RoutesDefinition<Services, HasLayoutFromOptions<Options>, never>;
+    ): RoutesDefinition<
+      Services,
+      HasLayoutFromOptions<Options>,
+      never,
+      never,
+      | Requirements
+      | Exclude<
+          RequirementsOf<Options extends { readonly layout: infer Layout } ? Layout : never>,
+          AvailableServices
+        >,
+      AvailableServices
+    >;
   };
 };
 
-export const makeRoutesFactory = <Services>(
+export const makeRoutesFactory = <Services, AvailableServices = Services, Requirements = never>(
   identity: ERSCIdentity<Services>,
   middleware: ReadonlyArray<AnyMiddleware<Services>>,
   allocateScopeId: () => number,
-): RoutesFactory<Services> => {
-  function make(): RoutesDefinition<Services, false, never>;
+): RoutesFactory<Services, AvailableServices, Requirements> => {
+  function make(): RoutesDefinition<Services, false, never, never, Requirements, AvailableServices>;
   function make<Options extends RoutesOptions<Services>>(
     options: Options,
-  ): RoutesDefinition<Services, HasLayoutFromOptions<Options>, never>;
+  ): RoutesDefinition<
+    Services,
+    HasLayoutFromOptions<Options>,
+    never,
+    never,
+    | Requirements
+    | Exclude<
+        RequirementsOf<Options extends { readonly layout: infer Layout } ? Layout : never>,
+        AvailableServices
+      >,
+    AvailableServices
+  >;
   function make(options: RoutesOptions<Services> = {}): AnyRoutes<Services> {
     if (options.layout !== undefined) {
       if (!isERSCMember(options.layout, 'Layout')) {

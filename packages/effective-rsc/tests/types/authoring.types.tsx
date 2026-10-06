@@ -145,7 +145,7 @@ ERSC.Routes.make().page('/users//history', HomePage);
 ERSC.Routes.make().page('/users/../history', HomePage);
 // @ts-expect-error Route definitions use decoded path text, not percent escapes.
 ERSC.Routes.make().page('/users/%61', HomePage);
-// @ts-expect-error Dynamic mount prefixes are not supported.
+// @ts-expect-error Dynamic mount prefixes require a Schema and service adapter.
 ERSC.Routes.make().mount('/:group', ERSC.Routes.make().page('/', HomePage));
 ERSC.make({
   // @ts-expect-error The final application path uses the framework namespace.

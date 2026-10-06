@@ -165,6 +165,9 @@ const httpLayer = <Services, ApplicationError>(
     const encodedParams = yield* destination.page.paramsSchema === null
       ? Effect.succeed(EmptyEncodedPageParams)
       : HttpRouter.params;
+    const localParams = Object.fromEntries(
+      destination.pageParameterNames.map((name) => [name, encodedParams[name]]),
+    );
     const renderResponse = Effect.fnUntraced(function* (params: PageParams) {
       const routeTree = renderRouteTree({
         destination,
@@ -210,7 +213,7 @@ const httpLayer = <Services, ApplicationError>(
     });
 
     if (request.method !== 'POST' && destination.page.paramsSchema !== null) {
-      return yield* Schema.decodeEffect(destination.page.paramsSchema)(encodedParams).pipe(
+      return yield* Schema.decodeEffect(destination.page.paramsSchema)(localParams).pipe(
         Effect.matchEffect({
           onFailure: () =>
             Effect.succeed(
@@ -220,7 +223,7 @@ const httpLayer = <Services, ApplicationError>(
         }),
       );
     }
-    return yield* renderResponse({ _tag: 'Encoded', value: encodedParams });
+    return yield* renderResponse({ _tag: 'Encoded', value: localParams });
   });
 
   const executeServerFnAndRefresh = (

@@ -62,7 +62,13 @@ stream queries require every alternative to be a Web Stream.
 `mount(prefix, routes)` mounts a non-empty graph of the same ERSC identity. Mounted graphs retain
 their Layout, Loading, and middleware ancestry.
 
-Page paths own `:parameter` segments. Mount prefixes are parameter-free. ERSC validates canonical
+Page paths own their local `:parameter` segments. Parameterized mounts own a separate Schema and
+an adapter returning an Effect Context. `withRequirements<Services>()` creates a same-identity
+view with explicit service ports; its Routes, Pages, and Layouts retain the outstanding requirements.
+Mount composition subtracts services supplied by the parent view or adapter. Remaining requirements
+survive intermediate scopes and are closed by the application Layer, which also allows the module
+to run independently of any ancestor URL. Server Function authoring rejects views with outstanding route requirements because queries
+have no route scope, including for middleware that consumes those requirements. ERSC validates canonical
 paths, duplicate matcher shapes, concern identity, parameter Schema keys, and the reserved `/_ersc`
 namespace. Effect HTTP remains the only runtime matcher.
 
@@ -71,6 +77,14 @@ Flight or HTML rendering begins. The Page receives those decoded values; Schema 
 an empty `404`. Decoding can use services from the application and existing route middleware and
 is interrupted with its request. Server Function POST refreshes retain parameter decoding inside
 Page rendering.
+
+Mount adapters compile into middleware at the mount boundary, after ancestor middleware and before
+child middleware. They decode only their prefix captures once per request, return an empty `404` on
+Schema rejection, and provide their Context to child middleware, Page decoding, and the render runtime.
+Page decoding projects only local Page captures. No additional matcher or ambient parameter scope is
+introduced. On POST the adapter scopes the refresh, not the action; rejection returns `404` after
+the action has executed. Adapter effects have no typed errors; expected HTTP outcomes should be
+handled by ancestor middleware. Their effects are interrupted with the request.
 
 Compilation flattens the graph into destinations containing the Page, middleware, and
 Layout/Loading ancestry. A graph may be mounted at several prefixes, so every destination owns its

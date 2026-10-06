@@ -10,6 +10,7 @@ import {
   getERSCIdentity,
   isERSCMember,
 } from './ersc-identity';
+import type { RequirementsOf } from './requirements';
 import { type CompiledRouteGraph, compileRouteGraph } from './route-graph';
 import type { AbsolutePath, ReservedRoutePath } from './route-path';
 import { type AnyRoutes, type RoutesHasLayout, type RoutesPaths } from './routes';
@@ -104,14 +105,17 @@ export type ERSCApplicationOptions<
   ApplicationError,
 > = {
   readonly routes: Definition & ValidRootRoutes<Services, Definition>;
-} & ApplicationLayerOptions<Services, ApplicationError>;
+} & ApplicationLayerOptions<Services | RequirementsOf<Definition>, ApplicationError>;
 
 export type ERSCMake<Services> = <Definition extends AnyRoutes<Services>, ApplicationError = never>(
   options: ERSCApplicationOptions<Services, Definition, ApplicationError>,
 ) => ApplicationDefinition<Services, ApplicationError>;
 
-function resolveApplicationLayer<Services, ApplicationError>(
-  layer: Layer.Layer<Services, ApplicationError, HttpRouter.HttpRouter> | undefined,
+function resolveApplicationLayer<Services, Requirements, ApplicationError>(
+  layer:
+    | Layer.Layer<Services | Requirements, ApplicationError, HttpRouter.HttpRouter>
+    | Layer.Layer<never, ApplicationError, HttpRouter.HttpRouter>
+    | undefined,
 ): Layer.Layer<Services, ApplicationError, HttpRouter.HttpRouter>;
 function resolveApplicationLayer(layer: Layer.Any | undefined): Layer.Any {
   return layer ?? Layer.empty;
@@ -132,6 +136,6 @@ export const makeApplication = <
   return new ApplicationDefinitionImpl(
     identity,
     compileRouteGraph(routes),
-    resolveApplicationLayer<Services, ApplicationError>(layer),
+    resolveApplicationLayer<Services, RequirementsOf<Definition>, ApplicationError>(layer),
   );
 };

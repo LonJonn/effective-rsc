@@ -76,13 +76,18 @@ type ValidateServerFnOutput<Output, Services> = [Output] extends [never]
           readonly 'A Server Function cannot mix Stream and non-stream return values': never;
         };
 
-export type ServerFnFactory<ApplicationServices, AvailableServices> = {
+export type ServerFnFactory<ApplicationServices, AvailableServices, Requirements = never> = {
   readonly make: <
     const Input extends ServerFnInput<AvailableServices> = readonly [],
     Output = never,
   >(
     options: ServerFnOptions<Input, Output, AvailableServices> &
-      ValidateServerFnOutput<Output, AvailableServices>,
+      ValidateServerFnOutput<Output, AvailableServices> &
+      ([Requirements] extends [never]
+        ? unknown
+        : {
+            readonly 'Server Functions require a view with satisfied service requirements': never;
+          }),
   ) => ServerFunction<ServerFnArguments<Input, 'Encoded'>, Output, ApplicationServices>;
 };
 
@@ -118,10 +123,10 @@ export const matchServerFnInvocation = <ApplicationServices>(
   return { _tag: 'Match', effect: metadata.effect, middleware: metadata.middleware };
 };
 
-export const makeServerFnFactory = <ApplicationServices, AvailableServices>(
+export const makeServerFnFactory = <ApplicationServices, AvailableServices, Requirements = never>(
   identity: ERSCIdentity<ApplicationServices>,
   middleware: ReadonlyArray<AnyMiddleware<ApplicationServices>>,
-): ServerFnFactory<ApplicationServices, AvailableServices> => ({
+): ServerFnFactory<ApplicationServices, AvailableServices, Requirements> => ({
   make: ({ input = [], handler }) => {
     const schemas = Array.ensure<Schema.ConstraintDecoder<unknown, AvailableServices>>(input);
     const decode = Schema.decodeUnknownEffect(Schema.Tuple(schemas));
